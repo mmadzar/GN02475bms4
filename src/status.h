@@ -35,9 +35,9 @@ struct Status : public StatusBase
     root["serialIntervalCell"] = intervals.serialIntervalCell;
     root["fakeError"] = fakeError;
 
-    JsonObject jcollectors = root.createNestedObject("collectors");
-    for (size_t i = 0; i < CollectorCount; i++)
-      jcollectors[settings.collectors[i].name] = collectors[i];
+    // JsonObject jcollectors = root.createNestedObject("collectors");
+    // for (size_t i = 0; i < CollectorCount; i++)
+    //   jcollectors[settings.collectors[i].name] = collectors[i];
 
     return root;
   }
