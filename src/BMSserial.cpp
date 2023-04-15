@@ -24,7 +24,7 @@ void getTimestamp(char *buffer)
         gettimeofday(&tv, NULL);
 
         microsec = tv.tv_usec;
-        strftime(buffer, 29, "%Y:%m:%d %H:%M:%S", &(status.timeinfo));
+        strftime(buffer, 29, "%Y-%m-%d %H:%M:%S", &(status.timeinfo));
         sprintf(buffer, "%s.%06d", buffer, microsec);
     }
 }
