@@ -13,22 +13,6 @@ BMSserial::BMSserial()
 {
 }
 
-void getTimestamp(char *buffer)
-{
-    if (strcmp(status.SSID, "") == 0 || !getLocalTime(&(status.timeinfo), 10))
-        sprintf(buffer, "INVALID TIME               ");
-    else
-    {
-        long microsec = 0;
-        struct timeval tv;
-        gettimeofday(&tv, NULL);
-
-        microsec = tv.tv_usec;
-        strftime(buffer, 29, "%Y-%m-%d %H:%M:%S", &(status.timeinfo));
-        sprintf(buffer, "%s.%06d", buffer, microsec);
-    }
-}
-
 void BMSserial::setup(class MqttPubSub &mqtt_client, Bytes2WiFi &wifiport, Bytes2WiFi &portDebug)
 {
     mqttClientBMS = &mqtt_client;
@@ -41,7 +25,9 @@ void BMSserial::setup(class MqttPubSub &mqtt_client, Bytes2WiFi &wifiport, Bytes
         configsBms[i] = new CollectorConfig(sc->name, sc->sendRate);
         status.colBms[i] = new Collector(*configsBms[i]);
         status.colBms[i]->onChange([](const char *name, int value, int min, int max, int samplesCollected, uint64_t timestamp)
-                                   { mqttClientBMS->sendMessageToTopic(String("{\"value\": ") + String(value) + ", \"min\": " + min + ", \"max\": " + max + ", \"samples\": " + samplesCollected +
+                                   {
+                                    if(samplesCollected>0) 
+                                    mqttClientBMS->sendMessageToTopic(String("{\"value\": ") + String(value) + ", \"min\": " + min + ", \"max\": " + max + ", \"samples\": " + samplesCollected +
                                                                            ", \"timestamp\": \"" + timestamp + "\"}",
                                                                        String(wifiSettings.hostname) + "/out/collectors/" + name); });
         status.colBms[i]->setup();
@@ -53,7 +39,9 @@ void BMSserial::setup(class MqttPubSub &mqtt_client, Bytes2WiFi &wifiport, Bytes
         configsCell[i] = new CollectorConfig(sc->name, sc->sendRate);
         status.colBmsCell[i] = new Collector(*configsCell[i]);
         status.colBmsCell[i]->onChange([](const char *name, int value, int min, int max, int samplesCollected, uint64_t timestamp)
-                                       { mqttClientBMS->sendMessageToTopic(String("{\"value\": ") + String(value) + ", \"min\": " + min + ", \"max\": " + max + ", \"samples\": " + samplesCollected +
+                                       { 
+                                            if(samplesCollected>0) 
+                                            mqttClientBMS->sendMessageToTopic(String("{\"value\": ") + String(value) + ", \"min\": " + min + ", \"max\": " + max + ", \"samples\": " + samplesCollected +
                                                                                ", \"timestamp\": \"" + timestamp + "\"}",
                                                                            String(wifiSettings.hostname) + "/out/collectors/" + name); });
         status.colBmsCell[i]->setup();
@@ -112,6 +100,13 @@ void BMSserial::setup(class MqttPubSub &mqtt_client, Bytes2WiFi &wifiport, Bytes
 long lastReport = 0;
 void BMSserial::handle()
 {
+    if (b2w->wifiCmdPos > 0)
+    {
+        device->send(b2w->wifiCommand, b2w->wifiCmdPos);
+        b2w->wifiCmdPos = 0;
+        device->handle();
+    }
+
     bool reqSent = 0;
     if (!status.monitorStarted)
         return;
@@ -128,17 +123,17 @@ void BMSserial::handle()
     }
 
     // cell check status interval is usually longer so checking it first
-    if (!device->waitingForResponse && (device->lastCommandSentCell == 0 || status.currentMillis - device->lastCommandSentCell >= intervals.serialIntervalCell)) // request interval ms (3 ms doesn't affect total number of request on baud 9600 (28 per sec - 331 on 115200 baud) but keeps queries devices less busy)
-    {
-        executed[0]++;
-        device->reqCells();
-        reqSent = 1;
-    }
-    else if (!device->waitingForResponse && (device->lastCommandSentInfo == 0 || status.currentMillis - device->lastCommandSentInfo >= intervals.serialInterval))
+    if ((device->lastCommandSentInfo == 0 || status.currentMillis - device->lastCommandSentInfo >= intervals.serialInterval))
     {
         executed[0]++;
         device->reqInfo();
         reqSent = 2;
+    }
+    else if ((device->lastCommandSentCell == 0 || status.currentMillis - device->lastCommandSentCell >= intervals.serialIntervalCell)) // request interval ms (3 ms doesn't affect total number of request on baud 9600 (28 per sec - 331 on 115200 baud) but keeps queries devices less busy)
+    {
+        executed[0]++;
+        device->reqCells();
+        reqSent = 1;
     }
 
     // retry code with timeout
@@ -161,17 +156,19 @@ void BMSserial::handle()
 
     // handle again in case there is immediate response - good at higher speeds
     if (device->waitingForResponse)
-        device->handle();
-
-    // handle collectors
-    if (strcmp(status.SSID, "") && reqSent > 0)
     {
-        if (reqSent == 1)
-            for (size_t i = 0; i < 24; i++)
-                status.colBmsCell[i]->handle();
-
-        if (reqSent == 2)
-            for (size_t i = 0; i < 6; i++)
-                status.colBms[i]->handle();
+        device->handle();
     }
+
+    // // handle collectors
+    // if (strcmp(status.SSID, "") && reqSent > 0)
+    // {
+    //     if (reqSent == 1)
+    //         for (size_t i = 0; i < 24; i++)
+    //             status.colBmsCell[i]->handle();
+
+    //     if (reqSent == 2)
+    //         for (size_t i = 0; i < 6; i++)
+    //             status.colBms[i]->handle();
+    // }
 }

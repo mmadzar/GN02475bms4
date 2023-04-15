@@ -34,6 +34,7 @@ public:
     const char *handle();
     uint16_t bufferIdx = 0;
     uint8_t buffer[1024];
+    int incomingByte = 0;
     int lastCommandSentInfo = 0;          // ms when last command was sent for info request
     int lastCommandSentCell = 0;          // ms when last command was sent for cells request
 
@@ -42,7 +43,6 @@ private:
 protected:
     Stream *device;
     uint16_t bufferSize = 1024;
-    int incomingByte = 0;
     int msgLength = 0;
     bool messageReceived = false;
     THandlerFunction_Message _message_callback;
