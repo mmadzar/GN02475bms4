@@ -34,8 +34,8 @@ void setup()
   Serial.println("Serial started!");
   pinMode(settings.led, OUTPUT);
 
-  pinMode(settings.lspwr, OUTPUT);
-  digitalWrite(settings.lspwr, HIGH);
+  // pinMode(settings.lspwr, OUTPUT);
+  // digitalWrite(settings.lspwr, HIGH);
 
   wota.setupWiFi();
   wota.setupOTA();
