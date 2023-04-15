@@ -32,37 +32,37 @@ struct Settings
   const gpio_num_t lspwr = (gpio_num_t)21; //logic converter board power pin
 
   CollectorConfig colBms[6] = {
-      {"ProtStatus", 500}, // protection status - error if >0
-      {"Temp1", 1000},
-      {"Temp2", 1000},
-      {"Temp3", 1000},
-      {"Temp4", 1000}, 
-      {"Remaining", 1000}};
+      {"ProtStatus", 0}, // protection status - error if >0
+      {"Temp1", 0},
+      {"Temp2", 0},
+      {"Temp3", 0},
+      {"Temp4", 0}, 
+      {"Remaining", 0}};
   CollectorConfig colBmsCell[24] = {
-      {"Cell01", 5000},
-      {"Cell02", 5000},
-      {"Cell03", 5000},
-      {"Cell04", 5000},
-      {"Cell05", 5000},
-      {"Cell06", 5000},
-      {"Cell07", 5000},
-      {"Cell08", 5000},
-      {"Cell09", 5000},
-      {"Cell10", 5000},
-      {"Cell11", 5000},
-      {"Cell12", 5000},
-      {"Cell13", 5000},
-      {"Cell14", 5000},
-      {"Cell15", 5000},
-      {"Cell16", 5000},
-      {"Cell17", 5000},
-      {"Cell18", 5000},
-      {"Cell19", 5000},
-      {"Cell20", 5000},
-      {"Cell21", 5000},
-      {"Cell22", 5000},
-      {"Cell23", 5000},
-      {"Cell24", 5000}};
+      {"Cell01", 0},
+      {"Cell02", 0},
+      {"Cell03", 0},
+      {"Cell04", 0},
+      {"Cell05", 0},
+      {"Cell06", 0},
+      {"Cell07", 0},
+      {"Cell08", 0},
+      {"Cell09", 0},
+      {"Cell10", 0},
+      {"Cell11", 0},
+      {"Cell12", 0},
+      {"Cell13", 0},
+      {"Cell14", 0},
+      {"Cell15", 0},
+      {"Cell16", 0},
+      {"Cell17", 0},
+      {"Cell18", 0},
+      {"Cell19", 0},
+      {"Cell20", 0},
+      {"Cell21", 0},
+      {"Cell22", 0},
+      {"Cell23", 0},
+      {"Cell24", 0}};
 
 #define CollectorCount 0
   CollectorConfig collectors[CollectorCount] = {};
