@@ -40,10 +40,10 @@ void BMSserial::setup(class MqttPubSub &mqtt_client, Bytes2WiFi &wifiport, Bytes
         CollectorConfig *sc = &settingsBmsCollectors.colBms[i];
         configsBms[i] = new CollectorConfig(sc->name, sc->sendRate);
         status.colBms[i] = new Collector(*configsBms[i]);
-        status.colBms[i]->onChange([](const char *name, int value, int min, int max, int samplesCollected, char *timestamp)
-                                   { mqttClientBMS->sendMessage(String("{\"value\": ") + String(value) + ", \"min\": " + min + ", \"max\": " + max + ", \"samples\": " + samplesCollected +
-                                                                    ", \"timestamp\": \"" + timestamp + "\"}",
-                                                                String(wifiSettings.hostname) + "/out/collectors/" + name); });
+        status.colBms[i]->onChange([](const char *name, int value, int min, int max, int samplesCollected, uint64_t timestamp)
+                                   { mqttClientBMS->sendMessageToTopic(String("{\"value\": ") + String(value) + ", \"min\": " + min + ", \"max\": " + max + ", \"samples\": " + samplesCollected +
+                                                                           ", \"timestamp\": \"" + timestamp + "\"}",
+                                                                       String(wifiSettings.hostname) + "/out/collectors/" + name); });
         status.colBms[i]->setup();
     }
 
@@ -52,10 +52,10 @@ void BMSserial::setup(class MqttPubSub &mqtt_client, Bytes2WiFi &wifiport, Bytes
         CollectorConfig *sc = &settingsBmsCollectors.colBmsCell[i];
         configsCell[i] = new CollectorConfig(sc->name, sc->sendRate);
         status.colBmsCell[i] = new Collector(*configsCell[i]);
-        status.colBmsCell[i]->onChange([](const char *name, int value, int min, int max, int samplesCollected, char *timestamp)
-                                       { mqttClientBMS->sendMessage(String("{\"value\": ") + String(value) + ", \"min\": " + min + ", \"max\": " + max + ", \"samples\": " + samplesCollected +
-                                                                        ", \"timestamp\": \"" + timestamp + "\"}",
-                                                                    String(wifiSettings.hostname) + "/out/collectors/" + name); });
+        status.colBmsCell[i]->onChange([](const char *name, int value, int min, int max, int samplesCollected, uint64_t timestamp)
+                                       { mqttClientBMS->sendMessageToTopic(String("{\"value\": ") + String(value) + ", \"min\": " + min + ", \"max\": " + max + ", \"samples\": " + samplesCollected +
+                                                                               ", \"timestamp\": \"" + timestamp + "\"}",
+                                                                           String(wifiSettings.hostname) + "/out/collectors/" + name); });
         status.colBmsCell[i]->setup();
     }
 
@@ -71,32 +71,30 @@ void BMSserial::setup(class MqttPubSub &mqtt_client, Bytes2WiFi &wifiport, Bytes
                                 {
                                 case 0x03:
                                 {
-                                    char ts[29];
-                                    getTimestamp(ts);
+                                    uint64_t ts = status.getTimestampMicro();
 
-                                    status.colBms[0]->handle ((message[20] * 256.0) + (message[21]), ts); // protection status
+                                    status.colBms[0]->handle ((int)((message[20] * 256.0) + (message[21])), ts); // protection status
 
                                     //8, 9 - remaining
                                     //10, 11 - full
                                     // pack info
                                     int remaining = (message[8] * 256.0) + (message[9]); // remaining capacity
                                     int full = (message[10] * 256.0) + (message[11]); // full capacity
-                                    status.colBms[1]->handle (remaining / full * 100, ts);
+                                    status.colBms[1]->handle ((int)(remaining / full * 100), ts);
 
-                                    status.colBms[2]->handle((((message[27] * 256.0) + message[28])) - 273.15, ts); // Celsius degrees*10
-                                    status.colBms[3]->handle((((message[29] * 256.0) + message[30])) - 273.15, ts); 
-                                    status.colBms[4]->handle((((message[31] * 256.0) + message[32])) - 273.15, ts); 
-                                    status.colBms[5]->handle((((message[33] * 256.0) + message[34])) - 273.15, ts); 
+                                    status.colBms[2]->handle((int)((((message[27] * 256.0) + message[28])) - 273.15), ts); // Celsius degrees*10
+                                    status.colBms[3]->handle((int)((((message[29] * 256.0) + message[30])) - 273.15), ts); 
+                                    status.colBms[4]->handle((int)((((message[31] * 256.0) + message[32])) - 273.15), ts); 
+                                    status.colBms[5]->handle((int)((((message[33] * 256.0) + message[34])) - 273.15), ts); 
                                 }
                                 break;
                                 case 0x04:
                                 {
-                                    char ts[29];
-                                    getTimestamp(ts);
+                                    uint64_t ts = status.getTimestampMicro();
                                     // cell voltages
                                     for (size_t i = 0; i < 24; i++)
                                     {
-                                        status.colBmsCell[i]->handle((message[(i*2) + 4] * 256.0) + (message[(i*2) + 1 + 4]), ts);
+                                        status.colBmsCell[i]->handle((int)((message[(i*2) + 4] * 256.0) + (message[(i*2) + 1 + 4])), ts);
                                     }
                                 }
                                 break;
@@ -114,6 +112,7 @@ void BMSserial::setup(class MqttPubSub &mqtt_client, Bytes2WiFi &wifiport, Bytes
 long lastReport = 0;
 void BMSserial::handle()
 {
+    bool reqSent = 0;
     if (!status.monitorStarted)
         return;
     if (device->waitingForResponse)
@@ -133,11 +132,13 @@ void BMSserial::handle()
     {
         executed[0]++;
         device->reqCells();
+        reqSent = 1;
     }
     else if (!device->waitingForResponse && (device->lastCommandSentInfo == 0 || status.currentMillis - device->lastCommandSentInfo >= intervals.serialInterval))
     {
         executed[0]++;
         device->reqInfo();
+        reqSent = 2;
     }
 
     // retry code with timeout
@@ -163,11 +164,14 @@ void BMSserial::handle()
         device->handle();
 
     // handle collectors
-    if (strcmp(status.SSID, "") != 0)
+    if (strcmp(status.SSID, "") && reqSent > 0)
     {
-        for (size_t i = 0; i < 6; i++)
-            status.colBms[i]->handle();
-        for (size_t i = 0; i < 24; i++)
-            status.colBmsCell[i]->handle();
+        if (reqSent == 1)
+            for (size_t i = 0; i < 24; i++)
+                status.colBmsCell[i]->handle();
+
+        if (reqSent == 2)
+            for (size_t i = 0; i < 6; i++)
+                status.colBms[i]->handle();
     }
 }
