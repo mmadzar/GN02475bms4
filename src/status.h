@@ -7,8 +7,8 @@
 
 struct Status : public StatusBase
 {
-  Collector *colBms[6];
-  Collector *colBmsCell[24];
+  int colBms[6];
+  int colBmsCell[24];
 
   String bmsCommand = "";
   int switches[SwitchCount]{};
@@ -18,8 +18,6 @@ struct Status : public StatusBase
   int serialBytesSize;
   bool monitorStarted = false;
   bool fakeError = false;
-
-#define BMScollectorCount 29 // 24 cells + 4 temps + protection_status
 
   void initBMScollectors()
   {
@@ -35,9 +33,13 @@ struct Status : public StatusBase
     root["serialIntervalCell"] = intervals.serialIntervalCell;
     root["fakeError"] = fakeError;
 
-    // JsonObject jcollectors = root.createNestedObject("collectors");
-    // for (size_t i = 0; i < CollectorCount; i++)
-    //   jcollectors[settings.collectors[i].name] = collectors[i];
+    JsonObject jcollectors = root.createNestedObject("collectorsGeneral");
+    for (size_t i = 0; i < 4; i++)
+      jcollectors[settings.colBms[i].name] = colBms[i];
+
+    JsonObject jcollectors1 = root.createNestedObject("collectorsCell");
+    for (size_t i = 0; i < 24; i++)
+      jcollectors1[settings.colBmsCell[i].name] = colBmsCell[i];
 
     return root;
   }

@@ -6,6 +6,9 @@ MqttPubSub *mqttClientBMS;
 Settings settingsBmsCollectors;
 Intervals intervals;
 WiFiSettings wifiSettings;
+Collector *colBms[6];
+Collector *colBmsCell[24];
+int msgLength = 0;
 
 long executed[2]; // number of executions send, receive in a second
 
@@ -23,28 +26,33 @@ void BMSserial::setup(class MqttPubSub &mqtt_client, Bytes2WiFi &wifiport, Bytes
     {
         CollectorConfig *sc = &settingsBmsCollectors.colBms[i];
         configsBms[i] = new CollectorConfig(sc->name, sc->sendRate);
-        status.colBms[i] = new Collector(*configsBms[i]);
-        status.colBms[i]->onChange([](const char *name, int value, int min, int max, int samplesCollected, uint64_t timestamp)
-                                   {
-                                    if(samplesCollected>0) 
-                                    mqttClientBMS->sendMessageToTopic(String("{\"value\": ") + String(value) + ", \"min\": " + min + ", \"max\": " + max + ", \"samples\": " + samplesCollected +
-                                                                           ", \"timestamp\": \"" + timestamp + "\"}",
-                                                                       String(wifiSettings.hostname) + "/out/collectors/" + name); });
-        status.colBms[i]->setup();
+        colBms[i] = new Collector(*configsBms[i]);
+        colBms[i]->onChange([](const char *name, int value, int min, int max, int samplesCollected, uint64_t timestamp)
+                            {
+                             if(samplesCollected>0) 
+                             {
+                                status.colBms[settingsBmsCollectors.getColBmsIndex(name)] = value;
+                                mqttClientBMS->sendMessageToTopic(String("{\"value\": ") + String(value) + ", \"min\": " + min + ", \"max\": " + max + ", \"samples\": " + samplesCollected +
+                                                                    ", \"timestamp\": \"" + timestamp + "\"}",
+                                                                String(wifiSettings.hostname) + "/out/collectors/" + name); 
+                             } });
+        colBms[i]->setup();
     }
 
     for (size_t i = 0; i < 24; i++)
     {
         CollectorConfig *sc = &settingsBmsCollectors.colBmsCell[i];
         configsCell[i] = new CollectorConfig(sc->name, sc->sendRate);
-        status.colBmsCell[i] = new Collector(*configsCell[i]);
-        status.colBmsCell[i]->onChange([](const char *name, int value, int min, int max, int samplesCollected, uint64_t timestamp)
-                                       { 
-                                            if(samplesCollected>0) 
-                                            mqttClientBMS->sendMessageToTopic(String("{\"value\": ") + String(value) + ", \"min\": " + min + ", \"max\": " + max + ", \"samples\": " + samplesCollected +
-                                                                               ", \"timestamp\": \"" + timestamp + "\"}",
-                                                                           String(wifiSettings.hostname) + "/out/collectors/" + name); });
-        status.colBmsCell[i]->setup();
+        colBmsCell[i] = new Collector(*configsCell[i]);
+        colBmsCell[i]->onChange([](const char *name, int value, int min, int max, int samplesCollected, uint64_t timestamp)
+                                { 
+                                     if(samplesCollected>0) {
+                                        status.colBmsCell[settingsBmsCollectors.getColBmsCellIndex(name)] = value;
+                                        mqttClientBMS->sendMessageToTopic(String("{\"value\": ") + String(value) + ", \"min\": " + min + ", \"max\": " + max + ", \"samples\": " + samplesCollected +
+                                                                        ", \"timestamp\": \"" + timestamp + "\"}",
+                                                                    String(wifiSettings.hostname) + "/out/collectors/" + name);
+                                } });
+        colBmsCell[i]->setup();
     }
 
     const SerialConfig *ss;
@@ -54,6 +62,7 @@ void BMSserial::setup(class MqttPubSub &mqtt_client, Bytes2WiFi &wifiport, Bytes
     device->begin();
     device->onMessage([](uint8_t deviceIndex, uint8_t command, uint8_t *message, size_t length)
                       {
+                            msgLength=length;
                                 executed[1]++;
                                 switch (command)
                                 {
@@ -61,19 +70,19 @@ void BMSserial::setup(class MqttPubSub &mqtt_client, Bytes2WiFi &wifiport, Bytes
                                 {
                                     uint64_t ts = status.getTimestampMicro();
 
-                                    status.colBms[0]->handle ((int)((message[20] * 256.0) + (message[21])), ts); // protection status
+                                    colBms[0]->handle ((int)((message[20] * 256.0) + (message[21])), ts); // protection status
 
                                     //8, 9 - remaining
                                     //10, 11 - full
                                     // pack info
                                     int remaining = (message[8] * 256.0) + (message[9]); // remaining capacity
                                     int full = (message[10] * 256.0) + (message[11]); // full capacity
-                                    status.colBms[1]->handle ((int)(remaining / full * 100), ts);
+                                    colBms[1]->handle ((int)(remaining / full * 100), ts);
 
-                                    status.colBms[2]->handle((int)((((message[27] * 256.0) + message[28])) - 273.15), ts); // Celsius degrees*10
-                                    status.colBms[3]->handle((int)((((message[29] * 256.0) + message[30])) - 273.15), ts); 
-                                    status.colBms[4]->handle((int)((((message[31] * 256.0) + message[32])) - 273.15), ts); 
-                                    status.colBms[5]->handle((int)((((message[33] * 256.0) + message[34])) - 273.15), ts); 
+                                    colBms[2]->handle((int)((((message[27] * 256.0) + message[28])) - 273.15), ts); // Celsius degrees*10
+                                    colBms[3]->handle((int)((((message[29] * 256.0) + message[30])) - 273.15), ts); 
+                                    colBms[4]->handle((int)((((message[31] * 256.0) + message[32])) - 273.15), ts); 
+                                    colBms[5]->handle((int)((((message[33] * 256.0) + message[34])) - 273.15), ts); 
                                 }
                                 break;
                                 case 0x04:
@@ -82,7 +91,7 @@ void BMSserial::setup(class MqttPubSub &mqtt_client, Bytes2WiFi &wifiport, Bytes
                                     // cell voltages
                                     for (size_t i = 0; i < 24; i++)
                                     {
-                                        status.colBmsCell[i]->handle((int)((message[(i*2) + 4] * 256.0) + (message[(i*2) + 1 + 4])), ts);
+                                        colBmsCell[i]->handle((int)((message[(i*2) + 4] * 256.0) + (message[(i*2) + 1 + 4])), ts);
                                     }
                                 }
                                 break;
@@ -97,43 +106,57 @@ void BMSserial::setup(class MqttPubSub &mqtt_client, Bytes2WiFi &wifiport, Bytes
                                 } });
 }
 
+void BMSserial::handleDevice()
+{
+    device->handle();
+    if (msgLength > 0)
+    {
+        b2wdebug->addBuffer('c');
+        b2w->addBuffer((char *)device->buffer, msgLength);
+        msgLength = 0; // message sent to WiFi port
+    }
+}
+
 long lastReport = 0;
 void BMSserial::handle()
 {
+    handleDevice();
     if (b2w->wifiCmdPos > 0)
     {
-        device->send(b2w->wifiCommand, b2w->wifiCmdPos);
+        b2wdebug->addBuffer('a');
+        b2wdebug->addBuffer(device->send(b2w->wifiCommand, b2w->wifiCmdPos));
+        b2wdebug->addBuffer('b');
+        // device->send(b2w->wifiCommand, b2w->wifiCmdPos);
         b2w->wifiCmdPos = 0;
-        device->handle();
+        handleDevice();
     }
 
     bool reqSent = 0;
-    if (!status.monitorStarted)
-        return;
-    if (device->waitingForResponse)
-        device->handle();
 
     // report performance
     if (status.currentMillis - lastReport > 1000)
     {
+        millis();
         lastReport = status.currentMillis;
-        // Serial.println(String("executed ") + executed[0] + ", " + executed[1] + " " + device->waitingForResponse + " " + device->lastCommandSent + " " + status.currentMillis);
-        executed[0] = 0;
-        executed[1] = 0;
     }
 
+    if (!status.monitorStarted)
+        return;
     // cell check status interval is usually longer so checking it first
     if ((device->lastCommandSentInfo == 0 || status.currentMillis - device->lastCommandSentInfo >= intervals.serialInterval))
     {
         executed[0]++;
         device->reqInfo();
         reqSent = 2;
+        handleDevice();
     }
-    else if ((device->lastCommandSentCell == 0 || status.currentMillis - device->lastCommandSentCell >= intervals.serialIntervalCell)) // request interval ms (3 ms doesn't affect total number of request on baud 9600 (28 per sec - 331 on 115200 baud) but keeps queries devices less busy)
+
+    if ((device->lastCommandSentCell == 0 || status.currentMillis - device->lastCommandSentCell >= intervals.serialIntervalCell)) // request interval ms (3 ms doesn't affect total number of request on baud 9600 (28 per sec - 331 on 115200 baud) but keeps queries devices less busy)
     {
         executed[0]++;
         device->reqCells();
         reqSent = 1;
+        handleDevice();
     }
 
     // retry code with timeout
@@ -153,12 +176,6 @@ void BMSserial::handle()
     //     }
     //     Serial.println(".");
     // }
-
-    // handle again in case there is immediate response - good at higher speeds
-    if (device->waitingForResponse)
-    {
-        device->handle();
-    }
 
     // // handle collectors
     // if (strcmp(status.SSID, "") && reqSent > 0)

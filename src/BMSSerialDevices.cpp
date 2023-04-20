@@ -85,10 +85,6 @@ size_t BMSSerialDevice::reqInfo()
     lastCommandSentInfo = status.currentMillis;
     uint8_t m[7] = {0xDD, 0xA5, 0x03, 0x00, 0xFF, 0xFD, 0x77};
     uint8_t written = sendMessage(m, 7);
-    if (written != 7)
-        Serial.println(String("Error writing [") + index + "]...");
-
-    Serial.println("sending 03...");
     return written == 7 ? 0x03 : 0;
 }
 
@@ -100,6 +96,7 @@ size_t BMSSerialDevice::reqHardware()
 
 size_t BMSSerialDevice::sendMessage(uint8_t *m, size_t length)
 {
+    msgLength = 0;
     bufferIdx = 0; // reset buffer index
     return send(m, length);
     // Serial.print("Sending ");
@@ -116,11 +113,11 @@ const char *BMSSerialDevice::handle()
     //     //Serial.println(String("delaying ") + index);
     //     delay(10);
     // }
-
-    if (device->available())
+    while (device->available())
     {
-        if (bufferIdx == bufferSize - 5) // keeps some free space in buffer
+        if (bufferIdx >= bufferSize - 5)
             bufferIdx = 0;
+
         read();
 
         buffer[bufferIdx++] = incomingByte;
@@ -129,15 +126,15 @@ const char *BMSSerialDevice::handle()
         {
             msgLength = (buffer[bufferIdx - 1]); // The fourth byte holds the length of data, excluding last 3 bytes checksum etc
         }
+    }
 
-        if (msgLength > 0 && bufferIdx >= msgLength + 7)
-        {
-            _message_callback(index, buffer[1], buffer, bufferIdx);
-            // total message received, reset buffer index and collect new messsage
-            bufferIdx = 0;
-            waitingForResponse = false;
-            return "1";
-        }
+    if (msgLength > 0 && bufferIdx >= msgLength + 7)
+    {
+        _message_callback(index, buffer[1], buffer, bufferIdx);
+        // total message received, reset buffer index and collect new messsage
+        bufferIdx = 0;
+        waitingForResponse = false;
+        return "1";
     }
     return "";
 }

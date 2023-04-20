@@ -21,7 +21,7 @@ uint32_t lastBytesSent = 0; // millis when last packet is sent
 BMSserial bms;
 
 long loops = 0;
-long lastLoopReport = 0;
+unsigned long lastLoopReport = 0;
 
 bool firstRun = true;
 
@@ -40,7 +40,7 @@ void setup()
   wota.setupWiFi();
   wota.setupOTA();
   mqtt.setup();
-  bytesWiFi.setup(23);
+  bytesWiFi.setup(23, true);
   debugWiFi.setup(24);
   bms.setup(mqtt, bytesWiFi, debugWiFi);
 }

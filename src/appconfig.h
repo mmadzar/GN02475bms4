@@ -1,7 +1,7 @@
 #ifndef APPCONFIG_H_
 #define APPCONFIG_H_
 
-#define HOST_NAME "GN02475bms3" // same code for all bms instances 1, 2, 3, 4
+#define HOST_NAME "GN02475bms2" // same code for all bms instances 1, 2, 3, 4
 
 #include "../../secrets.h"
 #include <stdint.h>
@@ -28,15 +28,15 @@ struct Settings
 #define ListenChannelsCount 0
   const char *listenChannels[ListenChannelsCount] = {};
 
-  const gpio_num_t led = (gpio_num_t)2; // status led
-  const gpio_num_t lspwr = (gpio_num_t)21; //logic converter board power pin
+  const gpio_num_t led = (gpio_num_t)2;    // status led
+  const gpio_num_t lspwr = (gpio_num_t)21; // logic converter board power pin
 
   CollectorConfig colBms[6] = {
       {"ProtStatus", 0}, // protection status - error if >0
       {"Temp1", 0},
       {"Temp2", 0},
       {"Temp3", 0},
-      {"Temp4", 0}, 
+      {"Temp4", 0},
       {"Remaining", 0}};
   CollectorConfig colBmsCell[24] = {
       {"Cell01", 0},
@@ -70,6 +70,26 @@ struct Settings
 #define SwitchCount 0
   SwitchConfig switches[SwitchCount] = {};
 
+  int getColBmsIndex(const char *name)
+  {
+    for (size_t i = 0; i < 6; i++)
+    {
+      if (strcmp(colBms[i].name, name) == 0)
+        return i;
+    }
+    return -1;
+  }
+
+  int getColBmsCellIndex(const char *name)
+  {
+    for (size_t i = 0; i < 24; i++)
+    {
+      if (strcmp(colBmsCell[i].name, name) == 0)
+        return i;
+    }
+    return -1;
+  }
+
   int getSwitchIndex(devicet device)
   {
     for (size_t i = 0; i < SwitchCount; i++)
@@ -84,7 +104,7 @@ struct Intervals
 {
   int statusPublish = 1000;      // interval at which status is published to MQTT
   int click_onceDelay = 1000;    // milliseconds
-  int serialInterval = 2000;      // milliseconds - goes fom 500 when battery in use to 30 000 when not in use, configured over MQTT interval command
+  int serialInterval = 2000;     // milliseconds - goes fom 500 when battery in use to 30 000 when not in use, configured over MQTT interval command
   int serialIntervalCell = 5000; // milliseconds - goes fom 5000 when battery in use to 30 000 when not in use, configured over MQTT intervalCell command
 };
 

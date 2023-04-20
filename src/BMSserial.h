@@ -19,6 +19,7 @@ private:
     Bytes2WiFi *b2wdebug;
     CollectorConfig *configsBms[6];
     CollectorConfig *configsCell[24];
+    void handleDevice();
 
 public:
     BMSserial();
