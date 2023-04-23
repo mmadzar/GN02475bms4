@@ -1,7 +1,8 @@
 #ifndef APPCONFIG_H_
 #define APPCONFIG_H_
 
-#define HOST_NAME "GN02475bms2" // same code for all bms instances 1, 2, 3, 4
+// WARNING different serial pins
+#define HOST_NAME "GN02475bms4" // same code for all bms instances 1, 2, 3, 4 
 
 #include "../../secrets.h"
 #include <stdint.h>
@@ -20,7 +21,7 @@ struct SerialConfig
 
 struct SerialSettings
 {
-  const SerialConfig device = {"hs1", 9600, 19, 18, false};
+  const SerialConfig device = {"hs1", 9600, 18, 19, false}; //BMS2 is 19, 18 - others are 18, 19
 };
 
 struct Settings
@@ -33,11 +34,11 @@ struct Settings
 
   CollectorConfig colBms[6] = {
       {"ProtStatus", 0}, // protection status - error if >0
+      {"Remaining", 0},
       {"Temp1", 0},
       {"Temp2", 0},
       {"Temp3", 0},
-      {"Temp4", 0},
-      {"Remaining", 0}};
+      {"Temp4", 0}};
   CollectorConfig colBmsCell[24] = {
       {"Cell01", 0},
       {"Cell02", 0},
